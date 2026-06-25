@@ -16,7 +16,8 @@ const resumeButton = document.getElementById("resumeButton");
 const secondaryActionButton = document.getElementById("secondaryActionButton");
 const playerNameValue = document.getElementById("playerNameValue");
 const playerStatusValue = document.getElementById("playerStatusValue");
-const profileConsentButton = document.getElementById("profileConsentButton");`r`nconst debugInfoValue = document.getElementById("debugInfoValue");
+const profileConsentButton = document.getElementById("profileConsentButton");
+const debugInfoValue = document.getElementById("debugInfoValue");
 
 const BEST_SCORE_KEY = "glow-breaker-best";
 const HOME_SCREEN_PROMPT_KEY = "glow-breaker-home-screen-prompted";
@@ -24,6 +25,7 @@ const DEFAULT_PLAYER_NAME = "LINE User";
 const LIFF_SETUP_NAME = "LIFF ID Needed";
 const LINE_FALLBACK_NAME = "LINE Player";
 const PROFILE_CONSENT_LABEL = "\u30d7\u30ed\u30d5\u30a3\u30fc\u30eb\u306e\u8a31\u53ef\u3092\u8a2d\u5b9a";
+const LIFF_INIT_TIMEOUT_MS = 4000;
 const LIFF_ID = document.body.dataset.liffId || window.__LIFF_ID__ || "";
 const HAS_VALID_LIFF_ID = Boolean(LIFF_ID && LIFF_ID !== "YOUR_LIFF_ID");
 const IS_VERIFIED_MINI_APP = document.body.dataset.verifiedMiniApp === "true";
@@ -105,6 +107,15 @@ function setDebugInfo(message) {
   debugInfoValue.textContent = message;
 }
 
+function withTimeout(promise, ms, code = "TIMEOUT") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject({ code }), ms);
+    }),
+  ]);
+}
+
 async function requestProfileConsent() {
   if (!window.liff?.permission || typeof window.liff.permission.requestAll !== "function") {
     return;
@@ -128,6 +139,7 @@ async function requestProfileConsent() {
 async function initLineProfile() {
   setPlayerName(DEFAULT_PLAYER_NAME);
   setPlayerStatus("\u30d7\u30ed\u30d5\u30a3\u30fc\u30eb\u3092\u78ba\u8a8d\u4e2d...");
+  setDebugInfo("");
   setProfileConsentVisible(false);
 
   if (!window.liff) {
@@ -142,7 +154,7 @@ async function initLineProfile() {
   }
 
   try {
-    await window.liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
+    await withTimeout(window.liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true }), LIFF_INIT_TIMEOUT_MS, "INIT_TIMEOUT");
 
     if (!window.liff.isLoggedIn()) {
       setPlayerName(LINE_FALLBACK_NAME);
