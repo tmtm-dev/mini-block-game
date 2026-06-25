@@ -140,7 +140,7 @@ function resetPositions(resetBall = true) {
   state.paddle.width = Math.max(110, width * 0.22);
   state.paddle.x = width / 2 - state.paddle.width / 2;
   state.paddle.targetX = state.paddle.x;
-  state.paddle.y = height - 48;
+  state.paddle.y = height - 64;
 
   if (resetBall) {
     state.ball.radius = Math.max(8, width * 0.016);
