@@ -13,9 +13,19 @@ const messageTitle = document.getElementById("messageTitle");
 const messageCopy = document.getElementById("messageCopy");
 const startButton = document.getElementById("startButton");
 const resumeButton = document.getElementById("resumeButton");
+const secondaryActionButton = document.getElementById("secondaryActionButton");
+const playerNameValue = document.getElementById("playerNameValue");
 
 const BEST_SCORE_KEY = "glow-breaker-best";
+const HOME_SCREEN_PROMPT_KEY = "glow-breaker-home-screen-prompted";
+const DEFAULT_PLAYER_NAME = "Guest Player";
+const LINE_FALLBACK_NAME = "LINE Player";
+const LIFF_ID = document.body.dataset.liffId || window.__LIFF_ID__ || "";
+const IS_VERIFIED_MINI_APP = document.body.dataset.verifiedMiniApp === "true";
 const pointer = { active: false, x: 0 };
+let primaryOverlayAction = null;
+let secondaryOverlayAction = null;
+let homeScreenShortcutAvailable = false;
 
 const paletteSets = [
   ["#ff8b72", "#ffd166", "#40d8c2", "#70a7ff"],
@@ -54,6 +64,38 @@ const state = {
   bricks: [],
   particles: [],
 };
+
+function setPlayerName(name) {
+  if (!playerNameValue) {
+    return;
+  }
+
+  playerNameValue.textContent = name;
+}
+
+async function initLineProfile() {
+  setPlayerName(DEFAULT_PLAYER_NAME);
+
+  if (!window.liff || !LIFF_ID) {
+    return;
+  }
+
+  try {
+    await window.liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: false });
+
+    if (!window.liff.isLoggedIn()) {
+      setPlayerName(LINE_FALLBACK_NAME);
+      return;
+    }
+
+    homeScreenShortcutAvailable = Boolean(window.liff.isApiAvailable && window.liff.isApiAvailable("createShortcutOnHomeScreen"));
+    const profile = await window.liff.getProfile();
+    setPlayerName(profile.displayName || LINE_FALLBACK_NAME);
+  } catch (error) {
+    console.warn("LIFF profile load failed", error);
+    setPlayerName(DEFAULT_PLAYER_NAME);
+  }
+}
 
 function resizeCanvas() {
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -141,16 +183,82 @@ function updateHud() {
   stageValue.textContent = String(state.stage);
 }
 
-function showMessage({ eyebrow, title, copy, button }) {
+function setOverlayActions({ primaryLabel, primaryAction, secondaryLabel = "", secondaryAction = null }) {
+  resumeButton.textContent = primaryLabel;
+  primaryOverlayAction = primaryAction;
+  secondaryOverlayAction = secondaryAction;
+
+  if (secondaryLabel && secondaryAction) {
+    secondaryActionButton.textContent = secondaryLabel;
+    secondaryActionButton.classList.remove("hidden");
+  } else {
+    secondaryActionButton.classList.add("hidden");
+    secondaryActionButton.textContent = "";
+  }
+}
+
+function showMessage({ eyebrow, title, copy, button, action, secondaryButton = "", secondaryAction = null }) {
   messageEyebrow.textContent = eyebrow;
   messageTitle.innerHTML = title;
   messageCopy.textContent = copy;
-  resumeButton.textContent = button;
+  setOverlayActions({
+    primaryLabel: button,
+    primaryAction: action,
+    secondaryLabel: secondaryButton,
+    secondaryAction,
+  });
   messageOverlay.classList.remove("hidden");
 }
 
 function hideMessage() {
   messageOverlay.classList.add("hidden");
+  primaryOverlayAction = null;
+  secondaryOverlayAction = null;
+  secondaryActionButton.classList.add("hidden");
+}
+
+function markHomeScreenPromptShown() {
+  localStorage.setItem(HOME_SCREEN_PROMPT_KEY, "1");
+}
+
+function shouldOfferHomeScreenPrompt() {
+  return IS_VERIFIED_MINI_APP && !localStorage.getItem(HOME_SCREEN_PROMPT_KEY) && homeScreenShortcutAvailable;
+}
+
+function resumeGame() {
+  if (state.gameOver || state.won) {
+    beginGame();
+    return;
+  }
+
+  state.paused = false;
+  hideMessage();
+}
+
+function showFinalResultMessage(didWin) {
+  showMessage({
+    eyebrow: didWin ? "All Clear" : "Game Over",
+    title: didWin ? "All Stages Clear!" : "Try Again",
+    copy: didWin
+      ? "Chase a higher best score with one more run."
+      : "Link a longer combo to boost your score fast.",
+    button: "Retry",
+    action: beginGame,
+  });
+}
+
+async function handleHomeScreenChoice(shouldAdd) {
+  markHomeScreenPromptShown();
+
+  if (shouldAdd && window.liff && typeof window.liff.createShortcutOnHomeScreen === "function") {
+    try {
+      await window.liff.createShortcutOnHomeScreen({ url: window.location.href });
+    } catch (error) {
+      console.warn("Home screen shortcut request failed", error);
+    }
+  }
+
+  showFinalResultMessage(false);
 }
 
 function beginGame() {
@@ -281,6 +389,7 @@ function loseLife() {
     title: "One More Shot",
     copy: "Tap to launch the ball again and jump right back in.",
     button: "Continue",
+    action: resumeGame,
   });
   state.paused = true;
 }
@@ -297,14 +406,24 @@ function finishGame(didWin) {
   }
   updateHud();
 
-  showMessage({
-    eyebrow: didWin ? "All Clear" : "Game Over",
-    title: didWin ? "All Stages Clear!" : "Try Again",
-    copy: didWin
-      ? "Chase a higher best score with one more run."
-      : "Link a longer combo to boost your score fast.",
-    button: "Retry",
-  });
+  if (!didWin && shouldOfferHomeScreenPrompt()) {
+    showMessage({
+      eyebrow: "Add To Home",
+      title: "ホーム画面に追加しますか?",
+      copy: "次回からすぐに遊べるよう、Glow Breaker をホーム画面に追加できます。",
+      button: "追加する",
+      action: () => {
+        void handleHomeScreenChoice(true);
+      },
+      secondaryButton: "今回はしない",
+      secondaryAction: () => {
+        void handleHomeScreenChoice(false);
+      },
+    });
+    return;
+  }
+
+  showFinalResultMessage(didWin);
 }
 
 function advanceStage() {
@@ -325,6 +444,7 @@ function advanceStage() {
     title: `Stage ${state.stage}<br>Start`,
     copy: "The ball gets faster on every stage. Stay sharp.",
     button: "Next Stage",
+    action: resumeGame,
   });
   state.paused = true;
 }
@@ -596,16 +716,6 @@ function roundRect(context, x, y, width, height, radius) {
   context.closePath();
 }
 
-function resumeGame() {
-  if (state.gameOver || state.won) {
-    beginGame();
-    return;
-  }
-
-  state.paused = false;
-  hideMessage();
-}
-
 function togglePause() {
   if (!state.running || state.gameOver || state.won) {
     return;
@@ -618,6 +728,7 @@ function togglePause() {
       title: "Break Time",
       copy: "Resume whenever you are ready.",
       button: "Resume",
+      action: resumeGame,
     });
   } else {
     hideMessage();
@@ -639,7 +750,16 @@ function frame(timestamp) {
 
 pauseButton.addEventListener("click", togglePause);
 startButton.addEventListener("click", beginGame);
-resumeButton.addEventListener("click", resumeGame);
+resumeButton.addEventListener("click", () => {
+  if (typeof primaryOverlayAction === "function") {
+    primaryOverlayAction();
+  }
+});
+secondaryActionButton.addEventListener("click", () => {
+  if (typeof secondaryOverlayAction === "function") {
+    secondaryOverlayAction();
+  }
+});
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("blur", () => {
   if (state.running && !state.paused && !state.gameOver && !state.won) {
@@ -647,6 +767,7 @@ window.addEventListener("blur", () => {
   }
 });
 
+initLineProfile();
 attachControls();
 buildStage(1);
 resizeCanvas();

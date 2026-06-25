@@ -6,7 +6,7 @@
   <title>Glow Breaker</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
-<body>
+<body data-liff-id="YOUR_LIFF_ID" data-verified-mini-app="false">
   <div class="app-shell">
     <header class="topbar">
       <div>
@@ -42,6 +42,10 @@
         <div class="overlay" id="startOverlay">
           <div class="overlay-card">
             <p class="eyebrow">Tap & Slide</p>
+            <div class="player-chip" aria-live="polite">
+              <span class="player-chip-label">LINE User</span>
+              <strong id="playerNameValue">読み込み中...</strong>
+            </div>
             <h2>指でバーを動かして<br>ブロックを一気に崩そう</h2>
             <p class="overlay-copy">連続ヒットでコンボ倍率アップ。ステージが進むほどボールも速くなります。</p>
             <button id="startButton" class="primary-button" type="button">ゲームスタート</button>
@@ -53,7 +57,10 @@
             <p class="eyebrow" id="messageEyebrow">Paused</p>
             <h2 id="messageTitle">一時停止中</h2>
             <p class="overlay-copy" id="messageCopy">再開して続きを遊べます。</p>
-            <button id="resumeButton" class="primary-button" type="button">再開する</button>
+            <div class="overlay-actions">
+              <button id="resumeButton" class="primary-button" type="button">再開する</button>
+              <button id="secondaryActionButton" class="secondary-button hidden" type="button">あとで</button>
+            </div>
           </div>
         </div>
       </div>
@@ -65,6 +72,7 @@
     </section>
   </div>
 
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="./game.js"></script>
 </body>
 </html>
