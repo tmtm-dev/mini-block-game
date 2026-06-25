@@ -16,7 +16,7 @@ const resumeButton = document.getElementById("resumeButton");
 const secondaryActionButton = document.getElementById("secondaryActionButton");
 const playerNameValue = document.getElementById("playerNameValue");
 const playerStatusValue = document.getElementById("playerStatusValue");
-const profileConsentButton = document.getElementById("profileConsentButton");
+const profileConsentButton = document.getElementById("profileConsentButton");`r`nconst debugInfoValue = document.getElementById("debugInfoValue");
 
 const BEST_SCORE_KEY = "glow-breaker-best";
 const HOME_SCREEN_PROMPT_KEY = "glow-breaker-home-screen-prompted";
@@ -95,6 +95,14 @@ function setProfileConsentVisible(visible) {
   profileConsentButton.textContent = PROFILE_CONSENT_LABEL;
   profileConsentButton.disabled = false;
   profileConsentButton.classList.toggle("hidden", !visible);
+}
+
+function setDebugInfo(message) {
+  if (!debugInfoValue) {
+    return;
+  }
+
+  debugInfoValue.textContent = message;
 }
 
 async function requestProfileConsent() {
@@ -203,7 +211,10 @@ async function initLineProfile() {
   } catch (error) {
     console.warn("LIFF profile load failed", error);
     setPlayerName(LINE_FALLBACK_NAME);
-    setPlayerStatus("LIFF\u521d\u671f\u5316\u306b\u5931\u6557\u3057\u307e\u3057\u305f", "error");
+    const errorCode = error && typeof error === "object" && "code" in error ? String(error.code) : "UNKNOWN";
+    const currentUrl = window.location.href;
+    setPlayerStatus("LIFF\u521d\u671f\u5316\u306b\u5931\u6557\u3057\u307e\u3057\u305f (" + errorCode + ")", "error");
+    setDebugInfo("current URL:\n" + currentUrl + "\nLIFF ID:\n" + LIFF_ID);
   }
 }
 
